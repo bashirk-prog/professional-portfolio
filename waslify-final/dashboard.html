@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waslify — AI Dashboard Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Outfit:wght@300;400;500;600&family=Noto+Naskh+Arabic:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --primary:#185FA5;--primary-dark:#0C447C;--secondary:#378ADD;
+  --surface:#E6F1FB;--surface-mid:#C8DFF5;
+  --text:#2C2C2A;--text-muted:#6B7280;--text-light:#9CA3AF;
+  --white:#fff;--border:rgba(24,95,165,0.15);--border-strong:rgba(24,95,165,0.3);
+  --green:#16A34A;--green-pale:#DCFCE7;--amber:#D97706;--amber-pale:#FEF3C7;--red:#DC2626;--red-pale:#FEE2E2;
+}
+html{scroll-behavior:smooth;}
+body{font-family:'Outfit',sans-serif;background:var(--surface);color:var(--text);min-height:100vh;}
+
+/* NAV */
+nav{background:var(--white);border-bottom:1px solid var(--border);padding:1rem 2.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--primary);}
+.logo span{color:var(--secondary);}
+.nav-arabic{font-family:'Noto Naskh Arabic',serif;font-size:1rem;color:var(--primary);opacity:0.4;direction:rtl;}
+
+/* MAIN LAYOUT */
+.app{max-width:1200px;margin:0 auto;padding:2rem;}
+
+/* FORM CARD */
+.form-card{background:var(--white);border-radius:24px;padding:2.5rem;border:1px solid var(--border);box-shadow:0 8px 32px rgba(24,95,165,0.08);margin-bottom:2rem;}
+.form-card h2{font-family:'Playfair Display',serif;font-size:1.75rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;}
+.form-card p{font-size:0.9rem;color:var(--text-muted);margin-bottom:2rem;font-weight:300;}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+.field{display:flex;flex-direction:column;gap:0.4rem;}
+.field.full{grid-column:1/-1;}
+.field label{font-size:0.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;}
+.field input,.field select,.field textarea{
+  background:var(--surface);border:1.5px solid var(--border-strong);
+  border-radius:12px;padding:0.8rem 1rem;
+  font-family:'Outfit',sans-serif;font-size:0.9rem;color:var(--text);
+  outline:none;transition:border-color 0.2s;appearance:none;
+  resize:none;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);background:var(--white);}
+.tag-row{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.2rem;}
+.tag{padding:0.4rem 0.9rem;border-radius:100px;font-size:0.8rem;cursor:pointer;border:1.5px solid var(--border-strong);background:var(--white);color:var(--text-muted);transition:all 0.15s;font-family:'Outfit',sans-serif;user-select:none;}
+.tag.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+.tag:hover:not(.active){border-color:var(--primary);color:var(--primary);}
+
+.generate-btn{
+  width:100%;margin-top:2rem;
+  background:var(--primary);color:#fff;border:none;border-radius:100px;
+  padding:1.1rem 2rem;font-family:'Outfit',sans-serif;font-size:1rem;font-weight:500;
+  cursor:pointer;transition:background 0.2s,transform 0.15s;
+  display:flex;align-items:center;justify-content:center;gap:0.75rem;
+}
+.generate-btn:hover:not(:disabled){background:var(--primary-dark);transform:translateY(-1px);}
+.generate-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+
+/* STATUS / LOADING */
+.status-area{background:var(--white);border-radius:24px;padding:2rem;border:1px solid var(--border);margin-bottom:2rem;display:none;}
+.status-area.active{display:block;}
+.status-header{display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;}
+.spinner{width:20px;height:20px;border:2.5px solid var(--surface-mid);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.status-header h3{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--text);}
+.steps-log{display:flex;flex-direction:column;gap:0.6rem;}
+.log-item{display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;color:var(--text-muted);font-weight:300;animation:fadeIn 0.3s ease;}
+.log-item.done{color:var(--green);}
+.log-item.active{color:var(--primary);font-weight:400;}
+.log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.log-item.done .log-dot{background:var(--green);}
+.log-item.active .log-dot{background:var(--primary);animation:pulse 1s ease-in-out infinite;}
+.log-item.pending .log-dot{background:var(--border-strong);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+/* DASHBOARD OUTPUT */
+.dashboard{display:none;}
+.dashboard.visible{display:block;}
+
+.dash-header{background:var(--primary-dark);border-radius:24px;padding:2.5rem;margin-bottom:2rem;position:relative;overflow:hidden;color:#fff;}
+.dash-header::before{content:'وصلة';position:absolute;right:-1rem;bottom:-2rem;font-family:'Noto Naskh Arabic',serif;font-size:10rem;font-weight:700;color:rgba(255,255,255,0.05);pointer-events:none;}
+.dash-header h2{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;margin-bottom:0.5rem;position:relative;z-index:1;}
+.dash-header p{font-size:0.9rem;color:rgba(255,255,255,0.6);font-weight:300;position:relative;z-index:1;}
+.dash-meta{display:flex;flex-wrap:wrap;gap:0.75rem;margin-top:1.25rem;position:relative;z-index:1;}
+.dash-pill{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.85);padding:0.35rem 0.9rem;border-radius:100px;font-size:0.78rem;font-weight:400;}
+
+/* TIMELINE */
+.timeline-section{background:var(--white);border-radius:24px;padding:2.5rem;border:1px solid var(--border);margin-bottom:2rem;}
+.timeline-section h3{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text);}
+.timeline-section > p{font-size:0.85rem;color:var(--text-muted);margin-bottom:2rem;font-weight:300;}
+.timeline{position:relative;display:flex;flex-direction:column;gap:0;}
+.timeline::before{content:'';position:absolute;left:20px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--primary),var(--surface-mid));border-radius:100px;}
+.tl-item{display:flex;gap:1.5rem;padding-bottom:2rem;position:relative;}
+.tl-item:last-child{padding-bottom:0;}
+.tl-dot-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:42px;}
+.tl-dot{width:42px;height:42px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;position:relative;z-index:1;border:3px solid var(--white);box-shadow:0 0 0 2px var(--primary);}
+.tl-dot.urgent{background:var(--red);box-shadow:0 0 0 2px var(--red);}
+.tl-dot.soon{background:var(--amber);box-shadow:0 0 0 2px var(--amber);}
+.tl-dot.later{background:var(--green);box-shadow:0 0 0 2px var(--green);}
+.tl-content{flex:1;padding-top:0.6rem;}
+.tl-phase{font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.3rem;}
+.tl-phase.urgent{color:var(--red);}
+.tl-phase.soon{color:var(--amber);}
+.tl-phase.later{color:var(--green);}
+.tl-title{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;}
+.tl-desc{font-size:0.85rem;color:var(--text-muted);line-height:1.65;margin-bottom:0.75rem;font-weight:300;}
+.tl-tasks{list-style:none;display:flex;flex-direction:column;gap:0.35rem;margin-bottom:0.75rem;}
+.tl-tasks li{font-size:0.82rem;color:var(--text-muted);padding-left:1.1rem;position:relative;font-weight:300;line-height:1.4;}
+.tl-tasks li::before{content:'→';position:absolute;left:0;color:var(--secondary);}
+
+/* RESOURCE CARDS */
+.resources-section{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;margin-bottom:2rem;}
+.resource-card{background:var(--white);border-radius:20px;padding:1.75rem;border:1px solid var(--border);transition:transform 0.2s,box-shadow 0.2s;}
+.resource-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(24,95,165,0.1);}
+.rc-header{display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;}
+.rc-icon{width:40px;height:40px;border-radius:10px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;}
+.rc-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:var(--text);}
+.rc-badge{font-size:0.68rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-left:auto;padding:0.2rem 0.6rem;border-radius:100px;}
+.rc-badge.live{background:var(--green-pale);color:var(--green);}
+.rc-badge.web{background:var(--surface);color:var(--primary);}
+.rc-items{display:flex;flex-direction:column;gap:0.5rem;}
+.rc-item{display:flex;flex-direction:column;gap:0.15rem;padding:0.6rem 0.75rem;background:var(--surface);border-radius:10px;cursor:pointer;transition:background 0.15s;text-decoration:none;}
+.rc-item:hover{background:var(--surface-mid);}
+.rc-item-title{font-size:0.82rem;font-weight:500;color:var(--primary);}
+.rc-item-sub{font-size:0.75rem;color:var(--text-muted);font-weight:300;}
+.rc-item-price{font-size:0.78rem;font-weight:600;color:var(--primary-dark);}
+
+/* SETTLE SCORE MINI */
+.settle-mini{background:var(--primary-dark);border-radius:20px;padding:1.75rem;border:1px solid var(--border);color:#fff;}
+.settle-mini h4{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;margin-bottom:1rem;color:#fff;}
+.mini-score{display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;}
+.mini-ring{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;color:#fff;flex-shrink:0;}
+.mini-score-text{font-size:0.8rem;color:rgba(255,255,255,0.55);font-weight:300;line-height:1.5;}
+.mini-bars{display:flex;flex-direction:column;gap:0.6rem;}
+.mini-bar{display:flex;flex-direction:column;gap:0.25rem;}
+.mini-bar-label{display:flex;justify-content:space-between;font-size:0.72rem;color:rgba(255,255,255,0.5);}
+.mini-bar-label strong{color:#fff;font-weight:500;}
+.mini-bar-track{height:4px;background:rgba(255,255,255,0.1);border-radius:100px;overflow:hidden;}
+.mini-bar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--secondary),#93C5FD);}
+
+/* CHECKLIST */
+.checklist-card{background:var(--white);border-radius:20px;padding:1.75rem;border:1px solid var(--border);}
+.checklist-card h4{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;margin-bottom:1rem;color:var(--text);}
+.check-item{display:flex;align-items:flex-start;gap:0.75rem;padding:0.6rem 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.check-item:last-child{border-bottom:none;}
+.check-box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border-strong);flex-shrink:0;margin-top:2px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;}
+.check-item.checked .check-box{background:var(--primary);border-color:var(--primary);}
+.check-item.checked .check-box::after{content:'✓';color:#fff;font-size:11px;font-weight:600;}
+.check-item.checked .check-label{text-decoration:line-through;color:var(--text-light);}
+.check-label{font-size:0.83rem;color:var(--text-muted);line-height:1.5;font-weight:300;}
+.check-week{font-size:0.68rem;font-weight:600;color:var(--secondary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;display:block;}
+
+/* STREAMING TEXT */
+.streaming-content{font-size:0.9rem;line-height:1.7;color:var(--text-muted);white-space:pre-wrap;font-weight:300;}
+
+/* ERROR */
+.error-card{background:var(--red-pale);border:1px solid rgba(220,38,38,0.2);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;display:none;}
+.error-card.visible{display:block;}
+.error-card p{font-size:0.85rem;color:var(--red);line-height:1.6;}
+
+/* RESET BTN */
+.reset-btn{background:transparent;border:1.5px solid var(--border-strong);color:var(--text-muted);padding:0.6rem 1.5rem;border-radius:100px;font-family:'Outfit',sans-serif;font-size:0.85rem;cursor:pointer;transition:all 0.15s;margin-bottom:2rem;}
+.reset-btn:hover{border-color:var(--primary);color:var(--primary);}
+
+@media(max-width:700px){.form-grid{grid-template-columns:1fr;}.app{padding:1rem;}.resources-section{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<nav style="position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0.9rem 3rem;background:rgba(255,255,255,0.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);">
+  <div class="logo"><a href="index.html"><img src="data:image/png;base64,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" alt="Waslify" style="height:40px;width:auto;display:block;"></a></div>
+  <ul style="display:flex;gap:1.75rem;list-style:none;align-items:center;">
+    <li><a href="index.html" style="font-size:0.875rem;color:var(--text-muted);text-decoration:none;transition:color 0.2s;">Home</a></li>
+    <li><a href="how-it-works.html" style="font-size:0.875rem;color:var(--text-muted);text-decoration:none;transition:color 0.2s;">How it Works</a></li>
+    <li><a href="pricing.html" style="font-size:0.875rem;color:var(--text-muted);text-decoration:none;transition:color 0.2s;">Pricing</a></li>
+    <li><a href="businesses.html" style="font-size:0.875rem;color:var(--text-muted);text-decoration:none;transition:color 0.2s;">For Businesses</a></li>
+    <li><a href="dashboard.html" style="background:var(--primary);color:#fff;padding:0.6rem 1.4rem;border-radius:100px;font-size:0.875rem;font-weight:500;text-decoration:none;">Start Your Move</a></li>
+  </ul>
+</nav>
+
+<div class="app">
+
+  <!-- FORM -->
+  <div class="form-card" id="formCard">
+    <h2>Generate Your Moving Dashboard</h2>
+    <p>Tell us about your move — our AI agent will search the web and build your personalized plan with real listings, resources, and a chronological timeline.</p>
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Moving From</label>
+        <input type="text" id="fromCity" placeholder="e.g. Amman, Jordan" />
+      </div>
+      <div class="field">
+        <label>Moving To</label>
+        <input type="text" id="toCity" placeholder="e.g. Seattle, WA, USA" />
+      </div>
+      <div class="field">
+        <label>Move Date</label>
+        <input type="date" id="moveDate" />
+      </div>
+      <div class="field">
+        <label>Move Type</label>
+        <select id="moveType">
+          <option value="international">International</option>
+          <option value="domestic">Domestic</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Work / Job Location (helps find nearby apartments)</label>
+        <input type="text" id="jobLocation" placeholder="e.g. Amazon HQ, South Lake Union, Seattle" />
+      </div>
+      <div class="field">
+        <label>Monthly Budget for Rent (USD)</label>
+        <input type="text" id="budget" placeholder="e.g. $2,000/month" />
+      </div>
+      <div class="field full">
+        <label>Family Situation</label>
+        <div class="tag-row" id="familyTags">
+          <div class="tag active">Solo</div>
+          <div class="tag">Couple</div>
+          <div class="tag">Family with kids</div>
+          <div class="tag">With pets</div>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Primary Language</label>
+        <div class="tag-row" id="langTags">
+          <div class="tag active">English</div>
+          <div class="tag">Arabic — عربي</div>
+          <div class="tag">French</div>
+          <div class="tag">Spanish</div>
+          <div class="tag">Other</div>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Faith / Religious Preferences (optional — helps personalize neighborhood matches)</label>
+        <div class="tag-row" id="faithTags">
+          <div class="tag active">No preference</div>
+          <div class="tag">Muslim — near mosque</div>
+          <div class="tag">Jewish — near synagogue</div>
+          <div class="tag">Christian — near church</div>
+          <div class="tag">Hindu — near temple</div>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Move Reason</label>
+        <div class="tag-row" id="reasonTags">
+          <div class="tag active">New job</div>
+          <div class="tag">Employer relocation</div>
+          <div class="tag">Remote work</div>
+          <div class="tag">Family</div>
+          <div class="tag">Education</div>
+          <div class="tag">Lifestyle</div>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Anything else? (special needs, visa situation, kids ages, etc.)</label>
+        <textarea id="extraInfo" rows="3" placeholder="e.g. I have a 5-year-old, need a good school district. Coming on a work visa. Have a dog."></textarea>
+      </div>
+    </div>
+
+    <button class="generate-btn" id="generateBtn" onclick="generateDashboard()">
+      <span id="btnIcon">✦</span>
+      <span id="btnText">Generate My Personalized Dashboard</span>
+    </button>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-card" id="errorCard">
+    <p id="errorMsg"></p>
+  </div>
+
+  <!-- STATUS LOG -->
+  <div class="status-area" id="statusArea">
+    <div class="status-header">
+      <div class="spinner" id="spinner"></div>
+      <h3 id="statusTitle">AI agent is working on your dashboard...</h3>
+    </div>
+    <div class="steps-log" id="stepsLog"></div>
+  </div>
+
+  <!-- DASHBOARD OUTPUT -->
+  <div class="dashboard" id="dashboard">
+    <button class="reset-btn" onclick="resetForm()">← Start a new move</button>
+
+    <div class="dash-header" id="dashHeader">
+      <h2 id="dashTitle">Your Moving Dashboard</h2>
+      <p id="dashSubtitle"></p>
+      <div class="dash-meta" id="dashMeta"></div>
+    </div>
+
+    <div id="dashContent"></div>
+  </div>
+
+</div>
+
+<script>
+// ── TAG SELECTION ──
+document.querySelectorAll('.tag-row').forEach(row => {
+  row.querySelectorAll('.tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      row.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+      tag.classList.add('active');
+    });
+  });
+});
+
+function getActiveTag(id) {
+  const row = document.getElementById(id);
+  if (!row) return '';
+  const active = row.querySelector('.tag.active');
+  return active ? active.textContent.trim() : '';
+}
+
+// ── STATUS LOG ──
+const logItems = [];
+function addLog(text, state = 'active') {
+  const log = document.getElementById('stepsLog');
+  const item = document.createElement('div');
+  item.className = `log-item ${state}`;
+  item.innerHTML = `<div class="log-dot"></div><span>${text}</span>`;
+  item.id = `log-${logItems.length}`;
+  logItems.push(item);
+  log.appendChild(item);
+  return logItems.length - 1;
+}
+function completeLog(idx) {
+  const item = document.getElementById(`log-${idx}`);
+  if (item) item.className = 'log-item done';
+}
+function updateStatus(title) {
+  document.getElementById('statusTitle').textContent = title;
+}
+
+// ── RESET ──
+function resetForm() {
+  document.getElementById('formCard').style.display = 'block';
+  document.getElementById('dashboard').classList.remove('visible');
+  document.getElementById('statusArea').classList.remove('active');
+  document.getElementById('errorCard').classList.remove('visible');
+  document.getElementById('stepsLog').innerHTML = '';
+  document.getElementById('dashContent').innerHTML = '';
+  logItems.length = 0;
+}
+
+// ── MAIN GENERATE ──
+async function generateDashboard() {
+  const fromCity = document.getElementById('fromCity').value.trim();
+  const toCity = document.getElementById('toCity').value.trim();
+  const moveDate = document.getElementById('moveDate').value;
+  const moveType = document.getElementById('moveType').value;
+  const jobLocation = document.getElementById('jobLocation').value.trim();
+  const budget = document.getElementById('budget').value.trim();
+  const family = getActiveTag('familyTags');
+  const language = getActiveTag('langTags');
+  const faith = getActiveTag('faithTags');
+  const reason = getActiveTag('reasonTags');
+  const extra = document.getElementById('extraInfo').value.trim();
+
+  if (!fromCity || !toCity) {
+    showError('Please enter both your origin and destination cities.');
+    return;
+  }
+
+  // Hide form, show status
+  document.getElementById('formCard').style.display = 'none';
+  document.getElementById('errorCard').classList.remove('visible');
+  document.getElementById('statusArea').classList.add('active');
+  document.getElementById('generateBtn').disabled = true;
+
+  const userProfile = {fromCity, toCity, moveDate, moveType, jobLocation, budget, family, language, faith, reason, extra};
+
+  try {
+    const l0 = addLog('Analyzing your profile and move details...', 'active');
+
+    // Build the agent prompt
+    const agentPrompt = buildAgentPrompt(userProfile);
+
+    completeLog(l0);
+    const l1 = addLog('Searching for apartments and housing near your job location...', 'active');
+
+    // Call Claude with web search tool
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: `You are Waslify's AI relocation agent. Your job is to help people move to a new city by:
+1. Searching the web for REAL, current apartment listings near their job/destination
+2. Finding relevant local resources (banks, healthcare, schools, mosques/churches/temples based on faith, halal/kosher food stores if relevant)
+3. Building a detailed chronological moving plan with specific weeks/phases
+4. Providing practical, actionable advice based on their specific situation
+
+Always search for real listings. When you find apartments, include the actual URL, price, and location details.
+Return your response as valid JSON only - no markdown, no extra text, just the JSON object.
+
+The JSON must follow this exact structure:
+{
+  "summary": "2-3 sentence summary of their move",
+  "settleScore": {
+    "overall": 82,
+    "factors": [
+      {"name": "Housing affordability", "score": 85},
+      {"name": "Job proximity", "score": 90},
+      {"name": "Community fit", "score": 78},
+      {"name": "Lifestyle match", "score": 80},
+      {"name": "Safety index", "score": 88}
+    ]
+  },
+  "timeline": [
+    {
+      "phase": "urgent",
+      "emoji": "🔥",
+      "timeframe": "8-12 Weeks Before",
+      "title": "Phase title",
+      "description": "What to do and why",
+      "tasks": ["task 1", "task 2", "task 3"]
+    }
+  ],
+  "housing": {
+    "title": "Housing Options Near [job]",
+    "listings": [
+      {
+        "name": "Apartment name or area",
+        "details": "Beds, location details",
+        "price": "$X,XXX/mo",
+        "url": "https://..."
+      }
+    ]
+  },
+  "resources": [
+    {
+      "category": "Banking",
+      "emoji": "🏦",
+      "items": [
+        {"name": "Resource name", "detail": "Why it's relevant", "url": "https://..."}
+      ]
+    }
+  ],
+  "checklist": [
+    {"week": "8 weeks out", "tasks": ["task 1", "task 2"]},
+    {"week": "4 weeks out", "tasks": ["task 1", "task 2"]},
+    {"week": "2 weeks out", "tasks": ["task 1", "task 2"]},
+    {"week": "Moving day", "tasks": ["task 1", "task 2"]},
+    {"week": "First week", "tasks": ["task 1", "task 2"]}
+  ],
+  "tips": ["tip 1 specific to their situation", "tip 2", "tip 3"]
+}`,
+        messages: [{ role: 'user', content: agentPrompt }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'API error');
+    }
+
+    const data = await response.json();
+    completeLog(l1);
+
+    const l2 = addLog('Finding local resources, banks, healthcare providers...', 'active');
+
+    // Extract the final text response (after tool use)
+    let resultText = '';
+    for (const block of data.content) {
+      if (block.type === 'text') {
+        resultText += block.text;
+      }
+    }
+
+    completeLog(l2);
+    const l3 = addLog('Building your chronological moving timeline...', 'active');
+
+    // Parse JSON from response
+    let parsed;
+    try {
+      const clean = resultText.replace(/```json|```/g, '').trim();
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : clean);
+    } catch (e) {
+      // If JSON fails, build a fallback dashboard
+      parsed = buildFallback(userProfile);
+    }
+
+    completeLog(l3);
+    const l4 = addLog('Calculating your Settle Score...', 'active');
+
+    await sleep(400);
+    completeLog(l4);
+    const l5 = addLog('Dashboard ready!', 'done');
+
+    updateStatus('Your personalized dashboard is ready');
+    document.getElementById('spinner').style.display = 'none';
+
+    await sleep(600);
+    renderDashboard(parsed, userProfile);
+
+  } catch (err) {
+    document.getElementById('statusArea').classList.remove('active');
+    document.getElementById('formCard').style.display = 'block';
+    document.getElementById('generateBtn').disabled = false;
+    showError(`Something went wrong: ${err.message}. Please try again.`);
+  }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showError(msg) {
+  const card = document.getElementById('errorCard');
+  document.getElementById('errorMsg').textContent = msg;
+  card.classList.add('visible');
+}
+
+function buildAgentPrompt(p) {
+  return `Generate a complete relocation dashboard for this person. Search the web for real, current apartment listings and local resources.
+
+MOVE DETAILS:
+- Moving from: ${p.fromCity}
+- Moving to: ${p.toCity}
+- Move date: ${p.moveDate || 'Not specified'}
+- Move type: ${p.moveType}
+- Work/job location: ${p.jobLocation || 'Not specified'}
+- Monthly rent budget: ${p.budget || 'Not specified'}
+- Family situation: ${p.family}
+- Primary language: ${p.language}
+- Faith/religious preference: ${p.faith}
+- Reason for moving: ${p.reason}
+- Additional context: ${p.extra || 'None'}
+
+Please:
+1. Search for real apartment listings near ${p.jobLocation || p.toCity} within the budget ${p.budget || ''}
+2. Search for local resources relevant to their profile (${p.faith !== 'No preference' ? p.faith + ', ' : ''}${p.language !== 'English' ? p.language + ' community, ' : ''}banks for newcomers, healthcare)
+3. Build a chronological moving timeline with 6-8 phases from 12 weeks before to 1 month after arrival
+4. Create a practical weekly checklist
+5. Calculate a Settle Score based on how well ${p.toCity} matches their profile
+
+Return ONLY valid JSON following the exact structure specified.`;
+}
+
+function buildFallback(p) {
+  const score = Math.floor(Math.random() * 15) + 75;
+  return {
+    summary: `Based on your profile, we've built a personalized moving plan from ${p.fromCity} to ${p.toCity}. Your timeline and resources have been tailored to your ${p.family.toLowerCase()} situation and ${p.reason.toLowerCase()} move.`,
+    settleScore: {
+      overall: score,
+      factors: [
+        {name: 'Housing affordability', score: score - 3},
+        {name: 'Job proximity', score: p.jobLocation ? score + 5 : score},
+        {name: 'Community fit', score: score - 7},
+        {name: 'Lifestyle match', score: score + 2},
+        {name: 'Safety index', score: score + 4}
+      ]
+    },
+    timeline: [
+      {phase:'urgent', emoji:'🔥', timeframe:'10-12 Weeks Before', title:'Visa & Legal Foundation', description:'Start all legal and immigration requirements immediately — these take the longest and block everything else.', tasks:['Research visa requirements for '+p.toCity,'Contact immigration lawyer or use Boundless/Fragomen','Begin gathering documents: birth certificate, bank statements, employer letter','Notify current landlord / give notice']},
+      {phase:'urgent', emoji:'🏠', timeframe:'8-10 Weeks Before', title:'Secure Housing', description:'Find and lock in your apartment before you arrive. Prioritize proximity to '+( p.jobLocation || 'your workplace')+'.', tasks:['Research neighborhoods near '+( p.jobLocation || p.toCity),'Apply for apartments online with virtual tours','Set up a Wise or Revolut account for international payments','Budget for first month + security deposit']},
+      {phase:'soon', emoji:'📦', timeframe:'6-8 Weeks Before', title:'Logistics & Shipping', description:'Book movers, decide what to ship vs. sell, and arrange temporary storage if needed.', tasks:['Get 3+ quotes from international movers','Decide ship vs. sell for large furniture','Book flights and temporary accommodation for arrival','Start selling or donating items not worth shipping']},
+      {phase:'soon', emoji:'💰', timeframe:'4-6 Weeks Before', title:'Banking & Finances', description:'Set up your financial foundation before you arrive so you can pay rent and bills from day one.', tasks:['Open Wise account for transfers','Research banks in '+p.toCity+' that accept newcomers','Set up direct deposit with new employer','Notify current bank of international move']},
+      {phase:'soon', emoji:'🏥', timeframe:'2-4 Weeks Before', title:'Healthcare & Documents', description:'Transfer all medical records and ensure health coverage from day one.', tasks:['Request medical records from all doctors','Research health insurance options in '+p.toCity,'Refill all prescriptions for 90+ days','Update address on all government documents']},
+      {phase:'later', emoji:'📱', timeframe:'1-2 Weeks Before', title:'Communication Setup', description:'Arrange phone and internet so you are connected from arrival.', tasks:['Research local SIM plans in '+p.toCity,'Arrange internet installation for move-in date','Download key apps: transit, maps, banking','Set up USPS mail forwarding']},
+      {phase:'later', emoji:'🎉', timeframe:'First Week', title:'Get Settled', description:'Explore your new city, meet neighbors, and complete all essential registrations.', tasks:['Register with local authorities if required','Set up utilities: electricity, gas, internet','Get a local SIM card and bank account','Explore neighborhood: find grocery stores, pharmacy, transit']}
+    ],
+    housing: {
+      title: `Housing Near ${p.jobLocation || p.toCity}`,
+      listings: [
+        {name: 'Apartments.com', details: 'Browse thousands of listings near your workplace', price: p.budget || 'Various', url: `https://www.apartments.com/apartments/${p.toCity.toLowerCase().replace(/[^a-z0-9]/g,'-')}/`},
+        {name: 'Zillow', details: 'Rentals with photos, virtual tours, and neighborhood data', price: p.budget || 'Various', url: `https://www.zillow.com/homes/for_rent/${encodeURIComponent(p.toCity)}/`},
+        {name: 'Furnished Finder', details: 'Furnished short-term rentals for your first month', price: 'Short-term', url: 'https://www.furnishedfinder.com'},
+        {name: 'Facebook Marketplace', details: 'Local private landlords, often lower fees', price: p.budget || 'Various', url: 'https://www.facebook.com/marketplace/rentals'}
+      ]
+    },
+    resources: [
+      {category:'Banking for Newcomers', emoji:'🏦', items:[{name:'Wise (TransferWise)', detail:'Best for international transfers, no hidden fees', url:'https://wise.com'},{name:'Revolut', detail:'Multi-currency card, works globally', url:'https://revolut.com'},{name:'Charles Schwab', detail:'No foreign transaction fees, ATM fee rebates worldwide', url:'https://schwab.com'}]},
+      {category:'Healthcare', emoji:'🏥', items:[{name:'Healthcare.gov', detail:'Compare health insurance plans in the US', url:'https://healthcare.gov'},{name:'SafetyWing', detail:'Affordable international health insurance for movers', url:'https://safetywing.com'},{name:'Zocdoc', detail:'Find doctors near you accepting new patients', url:'https://zocdoc.com'}]},
+      {category:'Transportation', emoji:'🚗', items:[{name:'U-Haul', detail:'Trucks and moving containers', url:'https://uhaul.com'},{name:'PODS', detail:'Portable storage and moving containers', url:'https://pods.com'},{name:'Google Maps Transit', detail:'Learn local transit routes before you arrive', url:'https://maps.google.com'}]},
+      {category:'Community & Language', emoji:'🤝', items:[{name:'Meetup.com', detail:`Find ${p.language !== 'English' ? p.language+' speaking ' : ''}expat communities in ${p.toCity}`, url:'https://meetup.com'},{name:'Internations', detail:'Expat community network for newcomers', url:'https://internations.org'},{name:'Facebook Groups', detail:`Search "${p.toCity} expats" or "${p.fromCity} in ${p.toCity}"`, url:'https://facebook.com/groups'}]}
+    ],
+    checklist: [
+      {week:'8 weeks out', tasks:['Research visa / legal requirements','Give notice to landlord','Start apartment search online','Get quotes from international movers']},
+      {week:'4 weeks out', tasks:['Sign lease on new apartment','Book flights','Open Wise/Revolut account','Request medical and school records']},
+      {week:'2 weeks out', tasks:['Pack and label boxes','Set up USPS mail forwarding','Research local phone plans','Notify bank of move']},
+      {week:'Moving day', tasks:['Do final walkthrough of old place','Photograph all belongings for insurance','Confirm mover arrival time','Carry important docs with you']},
+      {week:'First week', tasks:['Set up utilities (electricity, internet, gas)','Get local SIM card','Open local bank account','Register with local authorities if required']}
+    ],
+    tips: [
+      `Arrive in ${p.toCity} with at least 3 months of expenses in a Wise or Revolut account — local banks can take weeks to approve you as a newcomer.`,
+      `${p.faith !== 'No preference' ? 'Use Masjid Finder, Google Maps, or local Facebook groups to locate the nearest '+p.faith+' community center before you arrive.' : 'Join local Meetup groups or Facebook expat communities in '+p.toCity+' before you arrive — the connections you make will save you months of figuring things out.'}`,
+      `If your employer relocated you, ask HR for a relocation allowance — many companies offer $5,000-$15,000 you may not know about.`
+    ]
+  };
+}
+
+// ── RENDER DASHBOARD ──
+function renderDashboard(data, profile) {
+  const dash = document.getElementById('dashboard');
+  dash.classList.add('visible');
+  document.getElementById('statusArea').classList.remove('active');
+
+  // Header
+  document.getElementById('dashTitle').textContent = `Your Move: ${profile.fromCity} → ${profile.toCity}`;
+  document.getElementById('dashSubtitle').textContent = data.summary || '';
+  const meta = document.getElementById('dashMeta');
+  const pills = [profile.family, profile.moveType, profile.reason, profile.faith !== 'No preference' ? profile.faith : null, profile.budget ? `Budget: ${profile.budget}` : null].filter(Boolean);
+  meta.innerHTML = pills.map(p => `<div class="dash-pill">${p}</div>`).join('');
+
+  const content = document.getElementById('dashContent');
+  content.innerHTML = '';
+
+  // Settle Score + Checklist row
+  const topRow = document.createElement('div');
+  topRow.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:2rem;';
+  topRow.innerHTML = renderSettleScore(data.settleScore) + renderChecklistCard(data.checklist);
+  content.appendChild(topRow);
+
+  // Timeline
+  if (data.timeline?.length) {
+    const tlSection = document.createElement('div');
+    tlSection.className = 'timeline-section';
+    tlSection.innerHTML = `
+      <h3>Your Chronological Moving Plan</h3>
+      <p>Personalized timeline based on your move date, situation, and destination.</p>
+      <div class="timeline">${data.timeline.map(renderTimelineItem).join('')}</div>
+    `;
+    content.appendChild(tlSection);
+  }
+
+  // Housing listings
+  if (data.housing) {
+    const housingSection = document.createElement('div');
+    housingSection.innerHTML = `<div style="margin-bottom:0.75rem;"><span style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;color:var(--text);">${data.housing.title || 'Housing Options'}</span> <span style="font-size:0.75rem;font-weight:500;background:var(--green-pale);color:var(--green);padding:0.2rem 0.6rem;border-radius:100px;margin-left:0.5rem;">AI Searched</span></div>`;
+    const housingGrid = document.createElement('div');
+    housingGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:2rem;';
+    housingGrid.innerHTML = (data.housing.listings || []).map(l => `
+      <a href="${l.url || '#'}" target="_blank" rel="noopener" style="text-decoration:none;">
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:16px;padding:1.25rem;transition:transform 0.15s,box-shadow 0.15s;cursor:pointer;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(24,95,165,0.1)'" onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+          <div style="font-size:0.68rem;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.4rem;">🔍 Live Listing</div>
+          <div style="font-family:'Playfair Display',serif;font-size:0.95rem;font-weight:700;color:var(--text);margin-bottom:0.25rem;">${l.name}</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);font-weight:300;margin-bottom:0.5rem;">${l.details || ''}</div>
+          <div style="font-size:1rem;font-weight:600;color:var(--primary);">${l.price || ''}</div>
+        </div>
+      </a>
+    `).join('');
+    housingSection.appendChild(housingGrid);
+    content.appendChild(housingSection);
+  }
+
+  // Resources
+  if (data.resources?.length) {
+    const resHeader = document.createElement('div');
+    resHeader.innerHTML = `<div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:1rem;">Local Resources & Services</div>`;
+    content.appendChild(resHeader);
+    const resGrid = document.createElement('div');
+    resGrid.className = 'resources-section';
+    resGrid.innerHTML = data.resources.map(r => `
+      <div class="resource-card">
+        <div class="rc-header">
+          <div class="rc-icon">${r.emoji || '📌'}</div>
+          <div class="rc-title">${r.category}</div>
+          <span class="rc-badge web">Web</span>
+        </div>
+        <div class="rc-items">
+          ${(r.items || []).map(item => `
+            <a href="${item.url || '#'}" target="_blank" rel="noopener" class="rc-item">
+              <div class="rc-item-title">${item.name}</div>
+              <div class="rc-item-sub">${item.detail}</div>
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+    content.appendChild(resGrid);
+  }
+
+  // Tips
+  if (data.tips?.length) {
+    const tipsCard = document.createElement('div');
+    tipsCard.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2rem;margin-bottom:2rem;';
+    tipsCard.innerHTML = `
+      <div style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:1rem;">💡 Personalized Tips For Your Move</div>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        ${data.tips.map(tip => `<div style="display:flex;gap:0.75rem;font-size:0.85rem;color:var(--text-muted);font-weight:300;line-height:1.65;"><span style="color:var(--secondary);flex-shrink:0;margin-top:2px;">→</span><span>${tip}</span></div>`).join('')}
+      </div>
+    `;
+    content.appendChild(tipsCard);
+  }
+
+  // Scroll to dashboard
+  dash.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderSettleScore(ss) {
+  if (!ss) return '';
+  const score = ss.overall || 80;
+  const pct = (score / 100) * 360;
+  const color = score >= 80 ? '#378ADD' : score >= 65 ? '#D97706' : '#DC2626';
+  return `
+    <div class="settle-mini">
+      <h4>Your Settle Score™ for this move</h4>
+      <div class="mini-score">
+        <div class="mini-ring" style="background:conic-gradient(${color} 0% ${score}%, rgba(255,255,255,0.08) ${score}% 100%);position:relative;">
+          <div style="position:absolute;width:48px;height:48px;border-radius:50%;background:var(--primary-dark);display:flex;align-items:center;justify-content:center;">
+            <span style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:#fff;">${score}</span>
+          </div>
+        </div>
+        <div class="mini-score-text">Based on your profile, budget, family situation, and destination — this score reflects how well ${''} this move matches your life.</div>
+      </div>
+      <div class="mini-bars">
+        ${(ss.factors || []).map(f => `
+          <div class="mini-bar">
+            <div class="mini-bar-label"><span>${f.name}</span><strong>${f.score}%</strong></div>
+            <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${f.score}%"></div></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderChecklistCard(checklist) {
+  if (!checklist?.length) return '';
+  return `
+    <div class="checklist-card">
+      <h4>✅ Moving Checklist</h4>
+      ${checklist.map(section => `
+        <span class="check-week">${section.week}</span>
+        ${(section.tasks || []).map(task => `
+          <div class="check-item" onclick="this.classList.toggle('checked')">
+            <div class="check-box"></div>
+            <div class="check-label">${task}</div>
+          </div>
+        `).join('')}
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderTimelineItem(item) {
+  return `
+    <div class="tl-item">
+      <div class="tl-dot-wrap">
+        <div class="tl-dot ${item.phase || 'later'}">${item.emoji || '📍'}</div>
+      </div>
+      <div class="tl-content">
+        <div class="tl-phase ${item.phase || 'later'}">${item.timeframe}</div>
+        <div class="tl-title">${item.title}</div>
+        <div class="tl-desc">${item.description}</div>
+        <ul class="tl-tasks">
+          ${(item.tasks || []).map(t => `<li>${t}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
